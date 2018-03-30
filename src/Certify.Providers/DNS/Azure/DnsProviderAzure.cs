@@ -19,7 +19,7 @@ namespace Certify.Providers.DNS.Azure
             _credentials = credentials;
         }
 
-        public async Task InitProvider()
+        public async Task<bool> InitProvider()
         {
             // https://docs.microsoft.com/en-us/dotnet/api/overview/azure/dns?view=azure-dotnet
 
@@ -32,13 +32,14 @@ namespace Certify.Providers.DNS.Azure
             _dnsClient = new DnsManagementClient(serviceCreds);
 
             _dnsClient.SubscriptionId = _credentials["subscriptionid"];
+            return true;
         }
 
         public async Task<ActionResult> CreateRecord(DnsCreateRecordRequest request)
         {
             var recordSetParams = new RecordSet
             {
-                TTL = 1300,
+                TTL = 5,
                 TxtRecords = new List<TxtRecord>
                 {
                     new TxtRecord(new[] {
@@ -51,7 +52,7 @@ namespace Certify.Providers.DNS.Azure
             {
                 var result = await _dnsClient.RecordSets.CreateOrUpdateAsync(
                        _credentials["resourcegroupname"],
-                       _credentials["zoneid"],
+                       request.ZoneId,
                        request.RecordName,
                        RecordType.TXT,
                        recordSetParams
@@ -59,12 +60,16 @@ namespace Certify.Providers.DNS.Azure
 
                 if (result != null)
                 {
-                    return new ActionResult { IsSuccess = true, Message = "DNS TXT Record Created" };
+                    return new ActionResult
+                    {
+                        IsSuccess = true,
+                        Message = $"DNS TXT Record Created: {request.RecordName} with value: {request.RecordValue} "
+                    };
                 }
             }
             catch (Exception exp)
             {
-                new ActionResult { IsSuccess = false, Message = exp.InnerException.Message };
+                return new ActionResult { IsSuccess = false, Message = exp.InnerException.Message };
             }
 
             return new ActionResult { IsSuccess = false, Message = "DNS TXT Record create failed" };
@@ -76,7 +81,7 @@ namespace Certify.Providers.DNS.Azure
             {
                 await _dnsClient.RecordSets.DeleteAsync(
                        _credentials["resourcegroupname"],
-                       _credentials["zoneid"],
+                       request.ZoneId,
                        request.RecordName,
                        RecordType.TXT
                );
@@ -85,10 +90,8 @@ namespace Certify.Providers.DNS.Azure
             }
             catch (Exception exp)
             {
-                new ActionResult { IsSuccess = false, Message = exp.InnerException.Message };
+                return new ActionResult { IsSuccess = false, Message = "DNS TXT Record Delete failed: " + exp.InnerException.Message };
             }
-
-            return new ActionResult { IsSuccess = false, Message = "DNS TXT Record Delete failed" };
         }
 
         public async Task<List<DnsZone>> GetZones()

@@ -13,7 +13,7 @@ namespace Certify.Core.Management.Challenges
 {
     public class DNSChallengeHelper
     {
-        public async Task<ActionResult> CompleteDNSChallenge(ManagedSite managedsite, string domain, string txtRecordName, string txtRecordValue)
+        public async Task<ActionResult> CompleteDNSChallenge(ILog log, ManagedCertificate managedcertificate, string domain, string txtRecordName, string txtRecordValue)
         {
             // for a given managed site configuration, attempt to complete the required challenge by
             // creating the required TXT record
@@ -21,24 +21,29 @@ namespace Certify.Core.Management.Challenges
             var credentialsManager = new CredentialsManager();
             Dictionary<string, string> credentials = new Dictionary<string, string>();
 
-            string zoneId = null;
-
             Models.Config.ProviderDefinition providerDefinition;
             IDnsProvider dnsAPIProvider = null;
 
-            if (!String.IsNullOrEmpty(managedsite.RequestConfig.ChallengeCredentialKey))
+            var challengeConfig = managedcertificate.GetChallengeConfig(domain);
+
+            if (String.IsNullOrEmpty(challengeConfig.ZoneId))
+            {
+                return new ActionResult { IsSuccess = false, Message = "DNS Challenge Zone Id not set. Set the Zone Id to proceed." };
+            }
+
+            if (!String.IsNullOrEmpty(challengeConfig.ChallengeCredentialKey))
             {
                 // decode credentials string array
-                credentials = await credentialsManager.GetUnlockedCredentialsDictionary(managedsite.RequestConfig.ChallengeCredentialKey);
+                credentials = await credentialsManager.GetUnlockedCredentialsDictionary(challengeConfig.ChallengeCredentialKey);
             }
             else
             {
                 return new ActionResult { IsSuccess = false, Message = "DNS Challenge API Credentials not set. Add or select API credentials to proceed." };
             }
 
-            if (!String.IsNullOrEmpty(managedsite.RequestConfig.ChallengeProvider))
+            if (!String.IsNullOrEmpty(challengeConfig.ChallengeProvider))
             {
-                providerDefinition = Models.Config.ChallengeProviders.Providers.FirstOrDefault(p => p.Id == managedsite.RequestConfig.ChallengeProvider);
+                providerDefinition = Models.Config.ChallengeProviders.Providers.FirstOrDefault(p => p.Id == challengeConfig.ChallengeProvider);
             }
             else
             {
@@ -55,15 +60,11 @@ namespace Certify.Core.Management.Challenges
                 {
                     if (providerDefinition.Id == "DNS01.API.Route53")
                     {
-                        zoneId = credentials["zoneid"];
-
-                        dnsAPIProvider = new Providers.DNS.AWSRoute53.DnsProviderAWSRoute53(credentials["accesskey"], credentials["secretaccesskey"]);
+                        dnsAPIProvider = new Providers.DNS.AWSRoute53.DnsProviderAWSRoute53(credentials);
                     }
 
                     if (providerDefinition.Id == "DNS01.API.Azure")
                     {
-                        zoneId = credentials["zoneid"];
-
                         var azureDns = new DnsProviderAzure(credentials);
                         await azureDns.InitProvider();
                         dnsAPIProvider = azureDns;
@@ -71,8 +72,6 @@ namespace Certify.Core.Management.Challenges
 
                     if (providerDefinition.Id == "DNS01.API.Cloudflare")
                     {
-                        zoneId = credentials["zoneid"];
-
                         var azureDns = new DnsProviderCloudflare(credentials);
                         dnsAPIProvider = azureDns;
                     }
@@ -87,7 +86,7 @@ namespace Certify.Core.Management.Challenges
                     TargetDomainName = domain,
                     RecordName = txtRecordName,
                     RecordValue = txtRecordValue,
-                    ZoneId = zoneId
+                    ZoneId = challengeConfig.ZoneId.Trim()
                 });
 
                 if (result.IsSuccess)
@@ -109,6 +108,7 @@ namespace Certify.Core.Management.Challenges
                     }
                     */
 
+                    // FIXME: need a proper way to tell if DNS has updated
                     await Task.Delay(5000); // hold on a sec
 
                     return result;

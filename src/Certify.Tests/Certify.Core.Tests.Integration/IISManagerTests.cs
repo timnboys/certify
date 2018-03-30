@@ -5,6 +5,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -215,7 +216,7 @@ namespace Certify.Core.Tests
             Assert.AreEqual(site.Name, testBindingSiteName);
 
             var dummyCertPath = Environment.CurrentDirectory + "\\Assets\\dummycert.pfx";
-            var managedSite = new ManagedSite
+            var managedCertificate = new ManagedCertificate
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = testSiteName,
@@ -223,7 +224,13 @@ namespace Certify.Core.Tests
                 RequestConfig = new CertRequestConfig
                 {
                     PrimaryDomain = testSiteDomain,
-                    ChallengeType = "http-01",
+                    Challenges = new ObservableCollection<CertRequestChallengeConfig>(
+                        new List<CertRequestChallengeConfig>
+                        {
+                            new CertRequestChallengeConfig{
+                                ChallengeType="http-01"
+                            }
+                        }),
                     PerformAutoConfig = true,
                     PerformAutomatedCertBinding = true,
                     PerformChallengeFileCopy = true,
@@ -235,17 +242,17 @@ namespace Certify.Core.Tests
                     DeploymentBindingReplacePrevious = true,
                     SubjectAlternativeNames = new string[] { testSiteDomain, "label1." + testSiteDomain }
                 },
-                ItemType = ManagedItemType.SSL_LetsEncrypt_LocalIIS,
+                ItemType = ManagedCertificateType.SSL_LetsEncrypt_LocalIIS,
                 CertificatePath = dummyCertPath
             };
 
-            var actions = await iisManager.InstallCertForRequest(managedSite, dummyCertPath, false, false);
+            var actions = await iisManager.InstallCertForRequest(managedCertificate, dummyCertPath, false, false);
             foreach (var a in actions)
             {
                 System.Console.WriteLine(a.Description);
             }
             // get cert info to compare hash
-            var certInfo = CertificateManager.LoadCertificate(managedSite.CertificatePath);
+            var certInfo = CertificateManager.LoadCertificate(managedCertificate.CertificatePath);
 
             // check IIS site bindings
             site = iisManager.GetSiteById(site.Id.ToString());

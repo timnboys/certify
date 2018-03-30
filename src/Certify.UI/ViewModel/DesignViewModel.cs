@@ -25,25 +25,33 @@ namespace Certify.UI
             bool inDesignMode = !(Application.Current is App);
             if (inDesignMode)
             {
-                SelectedItem = ManagedSites.First();
+                SelectedItem = ManagedCertificates.First();
             }
         }
 
         private void GenerateMockData()
         {
             // generate 20 mock sites
-            ManagedSites = new ObservableCollection<ManagedSite>();
+            ManagedCertificates = new ObservableCollection<ManagedCertificate>();
             for (int i = 1; i <= 20; i++)
             {
-                var site = new ManagedSite()
+                var site = new ManagedCertificate()
                 {
                     Id = Guid.NewGuid().ToString(),
                     Name = $"test{i}.example.org",
-                    ItemType = ManagedItemType.SSL_LetsEncrypt_LocalIIS,
+                    ItemType = ManagedCertificateType.SSL_LetsEncrypt_LocalIIS,
                     DateExpiry = DateTime.Now.AddDays(60 - 5 * i),
+                    DateRenewed = DateTime.Now.AddDays(-15),
+                    DateLastRenewalAttempt = DateTime.Now,
+                    DateStart = DateTime.Now.AddMonths(-3),
+
                     RequestConfig = new CertRequestConfig()
                     {
-                        ChallengeType = SupportedChallengeTypes.CHALLENGE_TYPE_SNI,
+                        Challenges = new ObservableCollection<CertRequestChallengeConfig>(
+                           new List<CertRequestChallengeConfig> {
+                               new CertRequestChallengeConfig{ ChallengeType= SupportedChallengeTypes.CHALLENGE_TYPE_HTTP}
+                           }
+                           ),
                         PerformAutomatedCertBinding = true,
                         PreRequestPowerShellScript = @"c:\inetpub\scripts\pre-req-script.ps1",
                         PostRequestPowerShellScript = @"c:\inetpub\scripts\post-req-script.ps1",
@@ -68,22 +76,22 @@ namespace Certify.UI
                         IsSelected = j <= 3
                     });
                 }
-                ManagedSites.Add(site);
+                ManagedCertificates.Add(site);
             }
 
-            MockDataStore = JsonConvert.SerializeObject(ManagedSites);
-            foreach (var site in ManagedSites) site.IsChanged = false;
-            ManagedSites = new ObservableCollection<ManagedSite>(ManagedSites);
+            MockDataStore = JsonConvert.SerializeObject(ManagedCertificates);
+            foreach (var site in ManagedCertificates) site.IsChanged = false;
+            ManagedCertificates = new ObservableCollection<ManagedCertificate>(ManagedCertificates);
         }
 
         private string MockDataStore;
 
         public void LoadSettings()
         {
-            var mockSites = JsonConvert.DeserializeObject<List<ManagedSite>>(MockDataStore);
+            var mockSites = JsonConvert.DeserializeObject<List<ManagedCertificate>>(MockDataStore);
             foreach (var site in mockSites) site.IsChanged = false;
-            ManagedSites = new ObservableCollection<ManagedSite>(mockSites);
-            ImportedManagedSites = new ObservableCollection<ManagedSite>();
+            ManagedCertificates = new ObservableCollection<ManagedCertificate>(mockSites);
+            ImportedManagedCertificates = new ObservableCollection<ManagedCertificate>();
         }
 
         public override bool IsIISAvailable => true;

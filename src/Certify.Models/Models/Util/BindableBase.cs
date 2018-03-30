@@ -29,7 +29,7 @@ namespace Certify.Models
 #if DEBUG
                 // System.Diagnostics.Debug.WriteLine($"Model change: {prop} from {before} to {after}");
 #endif
-                IsChanged = true;
+                if (before != after) IsChanged = true;
             }
 
             // hook up to events
@@ -117,8 +117,11 @@ namespace Certify.Models
 
         private bool isChanged;
 
-        // recursively unsets IsChanged on a BindableBase object, any property on the object of type
-        // BindableBase, and any BindableBase objects nested in ICollection properties
+        /// <summary>
+        /// recursively unsets IsChanged on a BindableBase object, any property on the object of type
+        /// BindableBase, and any BindableBase objects nested in ICollection properties
+        /// </summary>
+        /// <param name="obj"></param>
         private void UnsetChanged(object obj)
         {
             if (obj is BindableBase bb)
